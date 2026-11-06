@@ -7,7 +7,14 @@ $db = db();
 $notesRepo = new NoteRepository($db);
 $userId = isset($_SESSION['user_id']) ? (int) $_SESSION['user_id'] : null;
 
-$action = $_POST['action'] ?? '';
+$isPost = $_SERVER['REQUEST_METHOD'] === 'POST';
+$action = $isPost ? (string) ($_POST['action'] ?? '') : '';
+
+// Every state-changing request must be a POST with a valid CSRF token.
+if ($isPost && !csrf_is_valid($_POST['csrf_token'] ?? null)) {
+    http_response_code(403);
+    exit('Invalid or missing CSRF token. Reload the page and try again.');
+}
 if ($action === 'register') {
     $email = $_POST['email'];
     $hash = password_hash($_POST['password'], PASSWORD_DEFAULT);
@@ -36,7 +43,7 @@ if ($action === 'login') {
     $message = 'Invalid email or password.';
 }
 
-if (in_array($action, ['save', 'update'], true) || isset($_GET['delete'])) {
+if (in_array($action, ['save', 'update', 'delete'], true)) {
     if ($userId === null) {
         http_response_code(401);
         exit('Please sign in.');
@@ -58,12 +65,12 @@ if ($action === 'update') {
     redirect();
 }
 
-if (isset($_GET['delete'])) {
-    $notesRepo->delete((int) $_GET['delete'], $userId);
+if ($action === 'delete') {
+    $notesRepo->delete((int) ($_POST['id'] ?? 0), $userId);
     redirect();
 }
 
-if (isset($_GET['logout'])) {
+if ($action === 'logout') {
     unset($_SESSION['user_id']);
     redirect();
 }
