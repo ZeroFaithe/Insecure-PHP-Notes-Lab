@@ -1,17 +1,12 @@
 <?php
+require __DIR__ . '/src/bootstrap.php';
+install_error_handler(true);
 session_start();
-ini_set('display_errors', '1');
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: ' . ($_SERVER['HTTP_ORIGIN'] ?? '*'));
 header('Access-Control-Allow-Credentials: true');
 
-$db = new PDO(
-    'mysql:host=localhost;dbname=notes_lab;charset=utf8mb4',
-    getenv('LAB_DB_USER') ?: 'root',
-    getenv('LAB_DB_PASSWORD') ?: ''
-);
-$db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-$db->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+$db = db();
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $owner = $_GET['user_id'] ?? '';

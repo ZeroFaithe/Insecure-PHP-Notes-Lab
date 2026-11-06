@@ -1,15 +1,9 @@
 <?php
+require __DIR__ . '/src/bootstrap.php';
+install_error_handler(false);
 session_start();
-ini_set('display_errors', '1');
-error_reporting(E_ALL);
 
-$db = new PDO(
-    'mysql:host=localhost;dbname=notes_lab;charset=utf8mb4',
-    getenv('LAB_DB_USER') ?: 'root',
-    getenv('LAB_DB_PASSWORD') ?: ''
-);
-$db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-$db->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+$db = db();
 
 $action = $_POST['action'] ?? '';
 if ($action === 'register') {
