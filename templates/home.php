@@ -3,6 +3,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta name="csrf-token" content="<?= e(csrf_token()) ?>">
 <title>Campus Notes</title>
 <link rel="stylesheet" href="assets/style.css">
 </head>

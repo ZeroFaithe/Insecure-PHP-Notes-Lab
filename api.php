@@ -5,14 +5,35 @@ require __DIR__ . '/src/bootstrap.php';
 install_error_handler(true);
 start_secure_session();
 header('Content-Type: application/json; charset=utf-8');
-header('Access-Control-Allow-Origin: ' . ($_SERVER['HTTP_ORIGIN'] ?? '*'));
-header('Access-Control-Allow-Credentials: true');
+header('Cache-Control: no-store');
+header('X-Content-Type-Options: nosniff');
+// No Access-Control-Allow-* headers: the API is same-origin only, so browsers
+// will not let other sites read responses or send preflighted requests.
 
 function json_response(int $status, array $data): never
 {
     http_response_code($status);
     echo json_encode($data);
     exit;
+}
+
+/** True when the request comes from this site (or a non-browser client that sends no Origin). */
+function is_same_origin_request(): bool
+{
+    $site = $_SERVER['HTTP_SEC_FETCH_SITE'] ?? null;
+    if ($site !== null && !in_array($site, ['same-origin', 'none'], true)) {
+        return false;
+    }
+    $origin = $_SERVER['HTTP_ORIGIN'] ?? null;
+    if ($origin === null) {
+        return true;
+    }
+    $expected = (is_https() ? 'https://' : 'http://') . ($_SERVER['HTTP_HOST'] ?? '');
+    return hash_equals($expected, $origin);
+}
+
+if (!is_same_origin_request()) {
+    json_response(403, ['error' => 'Cross-origin requests are not allowed']);
 }
 
 // Authentication: the API uses the same session as the web app.
@@ -32,7 +53,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // TODO: csrf / origin
+    // CSRF: require a JSON content type (cannot be sent by a plain HTML form
+    // without a CORS preflight) AND the session's CSRF token in a header.
+    $contentType = strtolower(trim(explode(';', $_SERVER['CONTENT_TYPE'] ?? '')[0]));
+    if ($contentType !== 'application/json') {
+        json_response(415, ['error' => 'Content-Type must be application/json']);
+    }
+    if (!csrf_is_valid($_SERVER['HTTP_X_CSRF_TOKEN'] ?? null)) {
+        json_response(403, ['error' => 'Invalid or missing CSRF token']);
+    }
     $raw = file_get_contents('php://input', false, null, 0, 65537);
     if ($raw === false || strlen($raw) > 65536) {
         json_response(413, ['error' => 'Request body too large']);
@@ -65,4 +94,5 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     json_response(200, ['updated' => 1]);
 }
 
+header('Allow: GET, POST');
 json_response(405, ['error' => 'Method not supported']);
