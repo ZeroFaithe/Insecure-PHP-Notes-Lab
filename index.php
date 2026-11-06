@@ -14,8 +14,8 @@ if ($action === 'register') {
     $role = 'student'; // never trust a role sent by the client
     $stmt = $db->prepare('INSERT INTO users (email, password_hash, role) VALUES (?, ?, ?)');
     $stmt->execute([$email, $hash, $role]);
-    header('Location: /?message=Account created');
-    exit;
+    flash('Account created. You can sign in now.');
+    redirect();
 }
 
 if ($action === 'login') {
@@ -31,10 +31,9 @@ if ($action === 'login') {
         }
         $_SESSION['user_id'] = $user['id'];
         $_SESSION['role'] = $user['role'];
-        header('Location: /');
-        exit;
+        redirect();
     }
-    $message = 'Login failed for ' . $email;
+    $message = 'Invalid email or password.';
 }
 
 if (in_array($action, ['save', 'update'], true) || isset($_GET['delete'])) {
@@ -47,8 +46,7 @@ if (in_array($action, ['save', 'update'], true) || isset($_GET['delete'])) {
 if ($action === 'save') {
     // owner comes from the session, not the form
     $notesRepo->create($userId, (string) $_POST['title'], (string) $_POST['body']);
-    header('Location: /');
-    exit;
+    redirect();
 }
 
 if ($action === 'update') {
@@ -57,23 +55,20 @@ if ($action === 'update') {
         http_response_code(404);
         exit('Note not found.');
     }
-    header('Location: /');
-    exit;
+    redirect();
 }
 
 if (isset($_GET['delete'])) {
     $notesRepo->delete((int) $_GET['delete'], $userId);
-    header('Location: /');
-    exit;
+    redirect();
 }
 
 if (isset($_GET['logout'])) {
     unset($_SESSION['user_id']);
-    header('Location: /');
-    exit;
+    redirect();
 }
 
-$message = $message ?? ($_GET['message'] ?? '');
+$message = $message ?? flash();
 $notes = [];
 $editing = false;
 if ($userId !== null) {
@@ -82,47 +77,12 @@ if ($userId !== null) {
         $editing = $notesRepo->findOwned((int) $_GET['edit'], $userId) ?? false;
     }
 }
-?>
-<!doctype html>
-<html lang="en">
-<head><meta charset="utf-8"><title>Campus Notes</title>
-<style>body{font:16px sans-serif;max-width:750px;margin:2rem auto}label{display:block;margin:.5rem 0}article{border:1px solid #aaa;padding:1rem;margin:1rem 0}</style>
-</head>
-<body>
-<h1>Campus Notes</h1>
-<p><?= $message ?></p>
-<?php if (!isset($_SESSION['user_id'])): ?>
-<h2>Register or sign in</h2>
-<form method="post">
-  <label>Email <input name="email" type="email" required></label>
-  <label>Password <input name="password" type="password" required></label>
-  <button name="action" value="register">Register</button>
-  <button name="action" value="login">Sign in</button>
-</form>
-<?php else: ?>
-<p>User ID: <?= $_SESSION['user_id'] ?> | Role: <?= $_SESSION['role'] ?> | <a href="?logout=1">Log out</a></p>
-<?php if ($editing): ?>
-<h2>Edit note</h2>
-<form method="post">
-  <input type="hidden" name="id" value="<?= $editing['id'] ?>">
-  <label>Title <input name="title" value="<?= $editing['title'] ?>" required></label>
-  <label>Body <textarea name="body" required><?= $editing['body'] ?></textarea></label>
-  <button name="action" value="update">Update</button>
-  <a href="/">Cancel</a>
-</form>
-<?php endif; ?>
-<h2>Create a note</h2>
-<form method="post">
-  <label>Title <input name="title" required></label>
-  <label>Body <textarea name="body" required></textarea></label>
-  <button name="action" value="save">Save</button>
-</form>
-<h2>Notes</h2>
-<?php foreach ($notes as $note): ?>
-<article><h3><?= $note['title'] ?></h3><p><?= $note['body'] ?></p>
-<small>Owner: <?= $note['user_id'] ?></small>
-<a href="?edit=<?= $note['id'] ?>">Edit</a>
-<a href="?delete=<?= $note['id'] ?>">Delete</a></article>
-<?php endforeach; ?>
-<?php endif; ?>
-</body></html>
+
+send_security_headers();
+render('home', [
+    'message' => $message,
+    'userId' => $userId,
+    'role' => $_SESSION['role'] ?? '',
+    'notes' => $notes,
+    'editing' => $editing,
+]);
