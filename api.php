@@ -32,10 +32,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // TODO: validate JSON + ownership + csrf
-    $data = json_decode(file_get_contents('php://input'), true);
-    $ok = $notesRepo->update((int) $data['id'], $userId, $data['title'], $data['body']);
-    json_response($ok ? 200 : 404, ['updated' => $ok ? 1 : 0]);
+    // TODO: csrf / origin
+    $raw = file_get_contents('php://input', false, null, 0, 65537);
+    if ($raw === false || strlen($raw) > 65536) {
+        json_response(413, ['error' => 'Request body too large']);
+    }
+    try {
+        $data = json_decode($raw, true, 8, JSON_THROW_ON_ERROR);
+    } catch (JsonException) {
+        json_response(400, ['error' => 'Malformed JSON']);
+    }
+    if (!is_array($data) || array_is_list($data)) {
+        json_response(400, ['error' => 'Expected a JSON object']);
+    }
+    $allowed = ['id', 'title', 'body'];
+    if (array_diff(array_keys($data), $allowed)) {
+        json_response(400, ['error' => 'Unexpected fields; only id, title and body are accepted']);
+    }
+    $id = $data['id'] ?? null;
+    if (!is_int($id) || $id < 1) {
+        json_response(422, ['error' => 'id must be a positive integer']);
+    }
+    $fields = validate_note($data['title'] ?? null, $data['body'] ?? null);
+    if ($fields === null) {
+        json_response(422, ['error' => 'title (1-120 chars) and body (1-10000 chars) are required strings']);
+    }
+    // Per-record authorization: update only succeeds for the caller's own note.
+    // 404 (not 403) so the API does not reveal which ids exist.
+    if (!$notesRepo->update($id, $userId, ...$fields)) {
+        json_response(404, ['error' => 'Note not found']);
+    }
+    json_response(200, ['updated' => 1]);
 }
 
 json_response(405, ['error' => 'Method not supported']);
