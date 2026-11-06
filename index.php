@@ -1,7 +1,7 @@
 <?php
 require __DIR__ . '/src/bootstrap.php';
 install_error_handler(false);
-session_start();
+start_secure_session();
 
 $db = db();
 $notesRepo = new NoteRepository($db);
@@ -36,8 +36,7 @@ if ($action === 'login') {
             $re = $db->prepare('UPDATE users SET password_hash = ? WHERE id = ?');
             $re->execute([password_hash($password, PASSWORD_DEFAULT), $user['id']]);
         }
-        $_SESSION['user_id'] = $user['id'];
-        $_SESSION['role'] = $user['role'];
+        login_session((int) $user['id'], (string) $user['role']);
         redirect();
     }
     $message = 'Invalid email or password.';
@@ -71,7 +70,7 @@ if ($action === 'delete') {
 }
 
 if ($action === 'logout') {
-    unset($_SESSION['user_id']);
+    end_session();
     redirect();
 }
 

@@ -1,7 +1,7 @@
 <?php
 require __DIR__ . '/src/bootstrap.php';
 install_error_handler(true);
-session_start();
+start_secure_session();
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: ' . ($_SERVER['HTTP_ORIGIN'] ?? '*'));
 header('Access-Control-Allow-Credentials: true');
