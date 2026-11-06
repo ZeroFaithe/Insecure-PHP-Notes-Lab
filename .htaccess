@@ -1,0 +1,5 @@
+# Apache/XAMPP: only index.php, api.php and assets/ should be reachable.
+Options -Indexes
+<FilesMatch "\.(sql|md|log|lock|json)$|^\.">
+    Require all denied
+</FilesMatch>
