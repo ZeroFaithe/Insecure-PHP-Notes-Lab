@@ -7,6 +7,7 @@ ini_set('log_errors', '1');
 error_reporting(E_ALL);
 
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/NoteRepository.php';
 
 /**
  * Generic error handler: log the details server-side, show a generic message.

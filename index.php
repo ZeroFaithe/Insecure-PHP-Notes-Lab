@@ -4,6 +4,8 @@ install_error_handler(false);
 session_start();
 
 $db = db();
+$notesRepo = new NoteRepository($db);
+$userId = isset($_SESSION['user_id']) ? (int) $_SESSION['user_id'] : null;
 
 $action = $_POST['action'] ?? '';
 if ($action === 'register') {
@@ -35,29 +37,32 @@ if ($action === 'login') {
     $message = 'Login failed for ' . $email;
 }
 
+if (in_array($action, ['save', 'update'], true) || isset($_GET['delete'])) {
+    if ($userId === null) {
+        http_response_code(401);
+        exit('Please sign in.');
+    }
+}
+
 if ($action === 'save') {
-    $owner = $_SESSION['user_id']; // owner comes from the session, not the form
-    $title = $_POST['title'];
-    $body = $_POST['body'];
-    $stmt = $db->prepare('INSERT INTO notes (user_id, title, body) VALUES (?, ?, ?)');
-    $stmt->execute([$owner, $title, $body]);
+    // owner comes from the session, not the form
+    $notesRepo->create($userId, (string) $_POST['title'], (string) $_POST['body']);
     header('Location: /');
     exit;
 }
 
 if ($action === 'update') {
-    $id = $_POST['id'];
-    $title = $_POST['title'];
-    $body = $_POST['body'];
-    $stmt = $db->prepare('UPDATE notes SET title = ?, body = ? WHERE id = ?');
-    $stmt->execute([$title, $body, $id]);
+    $ok = $notesRepo->update((int) $_POST['id'], $userId, (string) $_POST['title'], (string) $_POST['body']);
+    if (!$ok) {
+        http_response_code(404);
+        exit('Note not found.');
+    }
     header('Location: /');
     exit;
 }
 
 if (isset($_GET['delete'])) {
-    $stmt = $db->prepare('DELETE FROM notes WHERE id = ?');
-    $stmt->execute([$_GET['delete']]);
+    $notesRepo->delete((int) $_GET['delete'], $userId);
     header('Location: /');
     exit;
 }
@@ -71,12 +76,10 @@ if (isset($_GET['logout'])) {
 $message = $message ?? ($_GET['message'] ?? '');
 $notes = [];
 $editing = false;
-if (isset($_SESSION['user_id'])) {
-    $notes = $db->query('SELECT id, user_id, title, body FROM notes ORDER BY id DESC')->fetchAll();
+if ($userId !== null) {
+    $notes = $notesRepo->forUser($userId);
     if (isset($_GET['edit'])) {
-        $stmt = $db->prepare('SELECT id, title, body FROM notes WHERE id = ?');
-        $stmt->execute([$_GET['edit']]);
-        $editing = $stmt->fetch();
+        $editing = $notesRepo->findOwned((int) $_GET['edit'], $userId) ?? false;
     }
 }
 ?>
