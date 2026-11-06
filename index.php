@@ -19,8 +19,10 @@ if ($action === 'register') {
 if ($action === 'login') {
     $email = $_POST['email'];
     $hash = md5($_POST['password']);
-    $sql = "SELECT * FROM users WHERE email = '$email' AND password_hash = '$hash'";
-    $user = $db->query($sql)->fetch();
+    // TODO: still MD5, replace with password_hash/password_verify
+    $stmt = $db->prepare('SELECT id, role FROM users WHERE email = ? AND password_hash = ?');
+    $stmt->execute([$email, $hash]);
+    $user = $stmt->fetch();
     if ($user) {
         $_SESSION['user_id'] = $user['id'];
         $_SESSION['role'] = $user['role'];
@@ -34,8 +36,8 @@ if ($action === 'save') {
     $owner = $_POST['user_id'];
     $title = $_POST['title'];
     $body = $_POST['body'];
-    $sql = "INSERT INTO notes (user_id, title, body) VALUES ('$owner', '$title', '$body')";
-    $db->exec($sql);
+    $stmt = $db->prepare('INSERT INTO notes (user_id, title, body) VALUES (?, ?, ?)');
+    $stmt->execute([$owner, $title, $body]);
     header('Location: /');
     exit;
 }
