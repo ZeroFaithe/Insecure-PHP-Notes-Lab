@@ -38,3 +38,23 @@ function send_security_headers(): void
     header('X-Frame-Options: DENY');
     header('Referrer-Policy: same-origin');
 }
+
+const NOTE_TITLE_MAX = 120;
+const NOTE_BODY_MAX = 10000;
+
+/**
+ * Validates note fields. Returns [title, body] on success or null.
+ */
+function validate_note(mixed $title, mixed $body): ?array
+{
+    if (!is_string($title) || !is_string($body)) {
+        return null;
+    }
+    $title = trim($title);
+    $body = trim($body);
+    if ($title === '' || $body === ''
+        || mb_strlen($title) > NOTE_TITLE_MAX || mb_strlen($body) > NOTE_BODY_MAX) {
+        return null;
+    }
+    return [$title, $body];
+}

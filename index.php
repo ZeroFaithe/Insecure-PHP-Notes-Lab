@@ -16,17 +16,29 @@ if ($isPost && !csrf_is_valid($_POST['csrf_token'] ?? null)) {
     exit('Invalid or missing CSRF token. Reload the page and try again.');
 }
 if ($action === 'register') {
-    $email = $_POST['email'];
-    $hash = password_hash($_POST['password'], PASSWORD_DEFAULT);
-    $role = 'student'; // never trust a role sent by the client
-    $stmt = $db->prepare('INSERT INTO users (email, password_hash, role) VALUES (?, ?, ?)');
-    $stmt->execute([$email, $hash, $role]);
-    flash('Account created. You can sign in now.');
-    redirect();
+    $email = filter_var(trim((string) ($_POST['email'] ?? '')), FILTER_VALIDATE_EMAIL);
+    $password = (string) ($_POST['password'] ?? '');
+    if ($email === false || strlen($email) > 254 || strlen($password) < 12 || strlen($password) > 72) {
+        $message = 'Enter a valid email and a password of 12 to 72 characters.';
+    } else {
+        $hash = password_hash($password, PASSWORD_DEFAULT);
+        $role = 'student'; // never trust a role sent by the client
+        try {
+            $stmt = $db->prepare('INSERT INTO users (email, password_hash, role) VALUES (?, ?, ?)');
+            $stmt->execute([$email, $hash, $role]);
+        } catch (PDOException $e) {
+            if ($e->getCode() !== '23000') { // 23000 = duplicate email
+                throw $e;
+            }
+        }
+        // Same message either way so registration can't be used to list accounts.
+        flash('If the address was not already registered, the account was created. You can sign in now.');
+        redirect();
+    }
 }
 
 if ($action === 'login') {
-    $email = $_POST['email'];
+    $email = trim((string) ($_POST['email'] ?? ''));
     $password = (string) ($_POST['password'] ?? '');
     $stmt = $db->prepare('SELECT id, role, password_hash FROM users WHERE email = ?');
     $stmt->execute([$email]);
@@ -49,14 +61,22 @@ if (in_array($action, ['save', 'update', 'delete'], true)) {
     }
 }
 
+if ($action === 'save' || $action === 'update') {
+    $fields = validate_note($_POST['title'] ?? null, $_POST['body'] ?? null);
+    if ($fields === null) {
+        http_response_code(422);
+        exit('Title (max 120) and body (max 10000) are required.');
+    }
+}
+
 if ($action === 'save') {
     // owner comes from the session, not the form
-    $notesRepo->create($userId, (string) $_POST['title'], (string) $_POST['body']);
+    $notesRepo->create($userId, ...$fields);
     redirect();
 }
 
 if ($action === 'update') {
-    $ok = $notesRepo->update((int) $_POST['id'], $userId, (string) $_POST['title'], (string) $_POST['body']);
+    $ok = $notesRepo->update((int) ($_POST['id'] ?? 0), $userId, ...$fields);
     if (!$ok) {
         http_response_code(404);
         exit('Note not found.');
