@@ -9,7 +9,7 @@ $action = $_POST['action'] ?? '';
 if ($action === 'register') {
     $email = $_POST['email'];
     $hash = password_hash($_POST['password'], PASSWORD_DEFAULT);
-    $role = $_POST['role'];
+    $role = 'student'; // never trust a role sent by the client
     $stmt = $db->prepare('INSERT INTO users (email, password_hash, role) VALUES (?, ?, ?)');
     $stmt->execute([$email, $hash, $role]);
     header('Location: /?message=Account created');
@@ -36,7 +36,7 @@ if ($action === 'login') {
 }
 
 if ($action === 'save') {
-    $owner = $_POST['user_id'];
+    $owner = $_SESSION['user_id']; // owner comes from the session, not the form
     $title = $_POST['title'];
     $body = $_POST['body'];
     $stmt = $db->prepare('INSERT INTO notes (user_id, title, body) VALUES (?, ?, ?)');
@@ -93,7 +93,6 @@ if (isset($_SESSION['user_id'])) {
 <form method="post">
   <label>Email <input name="email" type="email" required></label>
   <label>Password <input name="password" type="password" required></label>
-  <label>Role <select name="role"><option>student</option><option>admin</option></select></label>
   <button name="action" value="register">Register</button>
   <button name="action" value="login">Sign in</button>
 </form>
@@ -111,7 +110,6 @@ if (isset($_SESSION['user_id'])) {
 <?php endif; ?>
 <h2>Create a note</h2>
 <form method="post">
-  <label>Owner ID <input name="user_id" value="<?= $_SESSION['user_id'] ?>"></label>
   <label>Title <input name="title" required></label>
   <label>Body <textarea name="body" required></textarea></label>
   <button name="action" value="save">Save</button>
