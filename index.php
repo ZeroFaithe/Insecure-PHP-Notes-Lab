@@ -8,7 +8,7 @@ $db = db();
 $action = $_POST['action'] ?? '';
 if ($action === 'register') {
     $email = $_POST['email'];
-    $hash = md5($_POST['password']);
+    $hash = password_hash($_POST['password'], PASSWORD_DEFAULT);
     $role = $_POST['role'];
     $stmt = $db->prepare('INSERT INTO users (email, password_hash, role) VALUES (?, ?, ?)');
     $stmt->execute([$email, $hash, $role]);
@@ -18,12 +18,15 @@ if ($action === 'register') {
 
 if ($action === 'login') {
     $email = $_POST['email'];
-    $hash = md5($_POST['password']);
-    // TODO: still MD5, replace with password_hash/password_verify
-    $stmt = $db->prepare('SELECT id, role FROM users WHERE email = ? AND password_hash = ?');
-    $stmt->execute([$email, $hash]);
+    $password = (string) ($_POST['password'] ?? '');
+    $stmt = $db->prepare('SELECT id, role, password_hash FROM users WHERE email = ?');
+    $stmt->execute([$email]);
     $user = $stmt->fetch();
-    if ($user) {
+    if ($user && password_verify($password, $user['password_hash'])) {
+        if (password_needs_rehash($user['password_hash'], PASSWORD_DEFAULT)) {
+            $re = $db->prepare('UPDATE users SET password_hash = ? WHERE id = ?');
+            $re->execute([password_hash($password, PASSWORD_DEFAULT), $user['id']]);
+        }
         $_SESSION['user_id'] = $user['id'];
         $_SESSION['role'] = $user['role'];
         header('Location: /');
