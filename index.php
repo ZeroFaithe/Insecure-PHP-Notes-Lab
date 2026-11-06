@@ -85,7 +85,10 @@ if ($action === 'update') {
 }
 
 if ($action === 'delete') {
-    $notesRepo->delete((int) ($_POST['id'] ?? 0), $userId);
+    if (!$notesRepo->delete((int) ($_POST['id'] ?? 0), $userId)) {
+        http_response_code(404);
+        exit('Note not found.');
+    }
     redirect();
 }
 
